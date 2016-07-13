@@ -23,3 +23,7 @@ This Programm let a Arduino Uno with its Ethernet Shield control a [IP Switch](h
 
 
 When Arduino communicate with the web server which build into the power distributer, Arduino act as a web client. Meanwhile there is a web server that is hosted in Arduino directely. It is used to set the parameters of the main programm that is running on the Arduino. In this scene the Arduino act as webserver. 
+
+### Features
+* All Parameter are read / saved in Arduino's EEPROM, That means, user won't worry about power failure.
+* Build in mechanisum to ensure the connection of Arduino Web client and power distributer web server.
