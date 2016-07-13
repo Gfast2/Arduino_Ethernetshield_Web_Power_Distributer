@@ -245,7 +245,7 @@ void setup() {
       Serial.println(F("Retry connect to Web Server of Power Distributor"));
       delay(250);
     }
-    Serial.println(F("connected"));
+    Serial.println(F("Retry Successed, connected!"));
   }
   // Load the saved value of each value.
   t = EEPROMReadlong(valAdr[0]);
