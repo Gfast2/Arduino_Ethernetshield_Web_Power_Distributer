@@ -37,7 +37,7 @@ EthernetServer webServer(80);
 char buffer[MAX_BUF];
 int sofar;
 unsigned long t = 11, r = 22, p = 33, q = 44;
-int valAdr[4] = {100,110,120,130};
+int valAdr[4] = {100, 110, 120, 130};
 //------------------------------------------------------------------------------
 //This function will write a 4 byte (32bit) long to the eeprom at
 //the specified address to address + 3.
@@ -142,7 +142,7 @@ void listenForEthernetClients() {
             if (strncmp(pch, "t=", 2) == 0)
             {
               t = atol(pch + 2);
-              EEPROMWritelong(valAdr[0],t);
+              EEPROMWritelong(valAdr[0], t);
               Serial.print("t=");
               Serial.println(t, DEC);
             }
@@ -150,7 +150,7 @@ void listenForEthernetClients() {
             if (strncmp(pch, "r=", 2) == 0)
             {
               r = atol(pch + 2);
-              EEPROMWritelong(valAdr[1],r);
+              EEPROMWritelong(valAdr[1], r);
               Serial.print("r=");
               Serial.println(r, DEC);
             }
@@ -158,7 +158,7 @@ void listenForEthernetClients() {
             if (strncmp(pch, "p=", 2) == 0)
             {
               p = atol(pch + 2);
-              EEPROMWritelong(valAdr[2],p);
+              EEPROMWritelong(valAdr[2], p);
               Serial.print("p=");
               Serial.println(p, DEC);
             }
@@ -166,7 +166,7 @@ void listenForEthernetClients() {
             if (strncmp(pch, "q=", 2) == 0)
             {
               q = atol(pch + 2);
-              EEPROMWritelong(valAdr[3],q);
+              EEPROMWritelong(valAdr[3], q);
               Serial.print("q=");
               Serial.println(q, DEC);
             }
@@ -241,7 +241,7 @@ void setup() {
     Serial.println(F("connection failed"));
     Serial.println(F("Retry connect to Web Server of Power Distributor"));
     delay(500);
-    while(!client.connect(server, 80)){
+    while (!client.connect(server, 80)) {
       Serial.println(F("Retry connect to Web Server of Power Distributor"));
       delay(250);
     }
@@ -252,7 +252,7 @@ void setup() {
   r = EEPROMReadlong(valAdr[1]);
   p = EEPROMReadlong(valAdr[2]);
   q = EEPROMReadlong(valAdr[3]);
-  
+
 }
 
 void loop() {
@@ -278,6 +278,5 @@ void loop() {
     Serial.println("Done.");  // echo completion
   }
 
-  // listen for incoming Ethernet connections:
-  listenForEthernetClients();
+  listenForEthernetClients(); // listen for incoming Ethernet connections:
 }
