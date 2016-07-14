@@ -25,7 +25,7 @@ EthernetServer webServer(80);
 // constants
 //------------------------------------------------------------------------------
 #define DELAY   (5)
-#define BAUD    (115200)
+#define BAUD    (250000)
 #define MAX_BUF (64)
 
 //------------------------------------------------------------------------------
@@ -65,34 +65,59 @@ unsigned long EEPROMReadlong(long address) {
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
-unsigned long onTime = 0;
+
 unsigned long onTime_old = 0;
-unsigned long offTime = 0;
 unsigned long offTime_old = 0;
-boolean state = true; // state of the switcher.
+boolean status = false; // state of the switcher.
 
 void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval, p-> max. steuerte IOs
   unsigned long tm = t * 1000; // sec. -> Milisec.
   unsigned long rm = r * 1000;
-  p = min(6, p); // Max. outputs are 6. das IP verteiler aus 8 IOs.
+  int maxOut = 6; // Max. outputs.
+  p = min(maxOut, p); // Max. outputs are 6. das IP verteiler aus 8 IOs.
 
   unsigned long now = millis(); // update time stampel
 
-  if (now - onTime_old > tm) { // time to reverse the switcher status.
-    state = false;
+
+  if (status == true) {
+    if (now - onTime_old > tm) { // time to reverse the switcher status.
+      Serial.println("\nTurn off pin ");
+      for (int i = 0; i < maxOut; i++) {
+        Serial.print("############### ");
+        Serial.println(i + 1);
+        client.print("GET /SWOV.CGI?s");
+        client.print(i + 1);
+        client.println("=0");
+        client.flush();
+        //        client.stop();
+        delay(100);
+        while (client.available() /*&& goon == false*/) {
+          char c = client.read(); // can not comment out, if so, buffer overflow.
+        }
+
+      }
+      delay(1000);
+    }
+
     onTime_old = now;
-  }
-
-
-  if (now - offTime_old > rm) { // time to reverse the switcher status.
-    state = true;
     offTime_old = now;
+    status = false;
+    Serial.println(F("Turn all pins off"));
+  }
+}
+
+
+else if (status == false) {
+  if (now - offTime_old > rm) { // time to reverse the switcher status.
+    status = true;
+    offTime_old = now;
+    onTime_old = now;
     // Generate 'p' outputs as "On", '6-p' output as "Off"
     int k = 1; // sum num. for selected number in IOs
     int arr[p]; // array save selected IO pins.
-    arr[0] = random(6);
+    arr[0] = random(maxOut);
     while ( k < p) {
-      int m = random(6);
+      int m = random(maxOut);
       boolean thrown = false;
       for (int i = 0; i < k; i++) {
         if (m == arr[i]) {
@@ -104,18 +129,35 @@ void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval,
         k++;
       }
     }
-    Serial.println("Generated random value now:");
+    Serial.println(F("\nGenerated random switch IO now:"));
     for (int i = 0; i < p; i++) {
-      Serial.println(arr[i]);
+      Serial.print("************* ");
+      Serial.println(arr[i] + 1);
+      // Make a HTTP request:
+      client.print("GET /SWOV.CGI?s");
+      client.print(arr[i] + 1);
+      client.println("=1");
+      client.flush();
+      delay(100);
+      while (client.available()) {
+        char c = client.read(); // can not comment out, if so, buffer overflow.
+        //          Serial.print(c);
+      }
+      delay(1000);
     }
   }
+}
+
+
 
 }
 
+
+
+
 void processCommand() {
   if (!strncmp(buffer, "help", 4)) {
-    Serial.println(F(
-                     "commands:\nls; List the status of all switch.\nsX=1; Turn on switch 'X'.\nsX=0;Turn off switch 'X'.\nconnect; Try connect to the switcher.\ndisconnect; Try disconnect to the switcher."));
+    Serial.println(F("commands:\nls; List the status of all switch.\nsX=1; Turn on switch 'X'.\nsX=0;Turn off switch 'X'.\nconnect; Try connect to the switcher.\ndisconnect; Try disconnect to the switcher."));
   } else if (!strncmp(buffer, "s", 1)) {
     Serial.println(F("got port setting."));
     char *ptr = buffer;
@@ -132,6 +174,9 @@ void processCommand() {
     if (client.connect(server, 80)) {
       Serial.println(F("connected"));
     } else {
+      //      while (!client.connect(server, 80)) {
+      //        Serial.println("Retry connect to server.");
+      //      }
       Serial.println(F("connection failed"));
     }
   } else if (!strncmp(buffer, "disconnect", 10)) {
@@ -267,7 +312,7 @@ void setup() {
   webServer.begin();
 
   // give the Ethernet shield a second to initialize:
-  delay(1000);
+  delay(100);
   Serial.println(F("connecting..."));
   // if you get a connection, report back via serial:
   if (client.connect(server, 80)) {
@@ -290,7 +335,7 @@ void loop() {
   // if there are incoming bytes available
   // from the server, read them and print them:
   if (client.available()) {
-    char c = client.read();
+    char c = client.read(); // can not comment out, if so, buffer overflow.
     Serial.print(c);
   }
 
@@ -311,5 +356,5 @@ void loop() {
 
   listenForEthernetClients(); // listen for incoming Ethernet connections:
 
-  work(1, 1, 2);
+  work(10, 10, 5);
 }
