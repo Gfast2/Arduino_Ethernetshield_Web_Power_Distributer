@@ -19,9 +19,6 @@ IPAddress ip(192, 168, 2, 5); // Own device's ip address
 EthernetClient client;
 
 // Try to build a small webserver interface in order to let user easieer to set parameters.
-// Initialize the Ethernet server library
-// with the IP address and port you want to use
-// (port 80 is default for HTTP):
 EthernetServer webServer(80);
 
 //------------------------------------------------------------------------------
@@ -66,6 +63,53 @@ unsigned long EEPROMReadlong(long address) {
   long one = EEPROM.read(address + 3);
   //Return the recomposed long by using bitshift.
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
+}
+
+unsigned long onTime = 0;
+unsigned long onTime_old = 0;
+unsigned long offTime = 0;
+unsigned long offTime_old = 0;
+boolean state = true; // state of the switcher.
+
+void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval, p-> max. steuerte IOs
+  unsigned long tm = t * 1000; // sec. -> Milisec.
+  unsigned long rm = r * 1000;
+  p = min(6, p); // Max. outputs are 6. das IP verteiler aus 8 IOs.
+
+  unsigned long now = millis(); // update time stampel
+
+  if (now - onTime_old > tm) { // time to reverse the switcher status.
+    state = false;
+    onTime_old = now;
+  }
+
+
+  if (now - offTime_old > rm) { // time to reverse the switcher status.
+    state = true;
+    offTime_old = now;
+    // Generate 'p' outputs as "On", '6-p' output as "Off"
+    int k = 1; // sum num. for selected number in IOs
+    int arr[p]; // array save selected IO pins.
+    arr[0] = random(6);
+    while ( k < p) {
+      int m = random(6);
+      boolean thrown = false;
+      for (int i = 0; i < k; i++) {
+        if (m == arr[i]) {
+          thrown = true;
+        }
+      }
+      if (thrown == false) {
+        arr[k] = m; // push in the result.
+        k++;
+      }
+    }
+    Serial.println("Generated random value now:");
+    for (int i = 0; i < p; i++) {
+      Serial.println(arr[i]);
+    }
+  }
+
 }
 
 void processCommand() {
@@ -139,39 +183,30 @@ void listenForEthernetClients() {
 
           while (pch != NULL)
           {
-            if (strncmp(pch, "t=", 2) == 0)
-            {
+            if (strncmp(pch, "t=", 2) == 0) {
               t = atol(pch + 2);
               EEPROMWritelong(valAdr[0], t);
               Serial.print("t=");
               Serial.println(t, DEC);
             }
-
-            if (strncmp(pch, "r=", 2) == 0)
-            {
+            if (strncmp(pch, "r=", 2) == 0) {
               r = atol(pch + 2);
               EEPROMWritelong(valAdr[1], r);
               Serial.print("r=");
               Serial.println(r, DEC);
             }
-
-            if (strncmp(pch, "p=", 2) == 0)
-            {
+            if (strncmp(pch, "p=", 2) == 0) {
               p = atol(pch + 2);
               EEPROMWritelong(valAdr[2], p);
               Serial.print("p=");
               Serial.println(p, DEC);
             }
-
-            if (strncmp(pch, "q=", 2) == 0)
-            {
+            if (strncmp(pch, "q=", 2) == 0) {
               q = atol(pch + 2);
               EEPROMWritelong(valAdr[3], q);
               Serial.print("q=");
               Serial.println(q, DEC);
             }
-
-
             pch = strtok(NULL, "& ");
           }
           Serial.println(F("Sending response"));
@@ -180,8 +215,7 @@ void listenForEthernetClients() {
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/html");
           client.println();
-          // print the current readings, in HTML format:
-          client.print(F("<!DOCTYPE html>"));
+          client.print(F("<!DOCTYPE html>")); // print the current readings, in HTML format:
           client.print(F("<style type='text/css'>BODY { margin: 9px 9px; background: #F0F0F0; font: 16px Courier;text-align: center;}</style>"));
           client.print(F("<html><body>"));
           client.println(F("<H1><span style='color:#AA3939'>(Awesome)</span> Power Distributor for Jo</H1>"));
@@ -219,6 +253,12 @@ void listenForEthernetClients() {
 
 
 void setup() {
+  // Load the saved value of each value.
+  t = EEPROMReadlong(valAdr[0]);
+  r = EEPROMReadlong(valAdr[1]);
+  p = EEPROMReadlong(valAdr[2]);
+  q = EEPROMReadlong(valAdr[3]);
+
   Serial.begin(BAUD);
   Serial.println(F("Network Steckerverteiler is running."));
   Serial.println(F("send 'help;' to get command list"));
@@ -229,13 +269,9 @@ void setup() {
   // give the Ethernet shield a second to initialize:
   delay(1000);
   Serial.println(F("connecting..."));
-
   // if you get a connection, report back via serial:
   if (client.connect(server, 80)) {
     Serial.println(F("connected"));
-    //    Make a HTTP request:
-    // client.println("GET /SWOV.CGI?s5=0");
-    // client.println();
   } else {
     // if you didn't get a connection to the server:
     Serial.println(F("connection failed"));
@@ -247,13 +283,8 @@ void setup() {
     }
     Serial.println(F("Retry Successed, connected!"));
   }
-  // Load the saved value of each value.
-  t = EEPROMReadlong(valAdr[0]);
-  r = EEPROMReadlong(valAdr[1]);
-  p = EEPROMReadlong(valAdr[2]);
-  q = EEPROMReadlong(valAdr[3]);
-
 }
+
 
 void loop() {
   // if there are incoming bytes available
@@ -279,4 +310,6 @@ void loop() {
   }
 
   listenForEthernetClients(); // listen for incoming Ethernet connections:
+
+  work(1, 1, 2);
 }
