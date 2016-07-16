@@ -1,6 +1,6 @@
 /* Web client programm for Arduino UNO to switch a "Junghanns.net" ip controled Power Distributor (verteilersteckdose)
  * written by : Su Gao
- * Last Edite : 2016-7-13
+ * Last Edite : 2016-7-14
  */
 
 #include <EEPROM.h>
@@ -36,6 +36,8 @@ int sofar;
 unsigned long t = 11, r = 22, p = 33, q = 44;
 int valAdr[4] = {100, 110, 120, 130};
 //------------------------------------------------------------------------------
+// functions
+//------------------------------------------------------------------------------
 //This function will write a 4 byte (32bit) long to the eeprom at
 //the specified address to address + 3.
 void EEPROMWritelong(int address, unsigned long value) {
@@ -65,6 +67,58 @@ unsigned long EEPROMReadlong(long address) {
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
+void switchControl(int io, boolean onoff){
+
+  // Copied from somewhere else.
+  if (client.connect(server, 80)) {
+    Serial.println("connected");
+    // client.println("GET /~shb/arduino.txt HTTP/1.0");
+    client.print("GET /SWOV.CGI?s");
+    client.print(io);
+    client.print("=");
+    client.println(onoff);
+    client.println();
+  } 
+  else {
+    Serial.println("connection failed");
+    Serial.println();
+  }
+
+
+
+
+  char htmlEnd[6] = {'a','a','a','a','a','a'};  
+  while(client.connected() && !client.available()) delay(1); //waits for data
+  while (client.connected() || client.available()) { //connected or data available
+    char c = client.read();
+    // Serial.write(c);
+    for(int i=0; i< 6; i++){
+      if(i<5){
+        htmlEnd[i] = htmlEnd[i+1];
+      }
+    }
+    htmlEnd[5] = c;
+    // for(int i= 0 ; i<6; i++){
+      // Serial.print(htmlEnd[i]);      
+    // }
+    // Serial.println();
+   if (!strncmp(htmlEnd, "/HTML>", 6)) { // Buffer to buffer out the last tag
+      Serial.println(F("\n############################################"));
+      Serial.println(F("/HTML found"));
+      // for(int i= 0 ; i<6; i++){
+      //   Serial.print(htmlEnd[i]);      
+      // }
+      // Serial.println();
+      break;
+   }
+  }
+
+  Serial.println();
+  Serial.println("disconnecting.");
+  Serial.println("==================");
+  Serial.println();
+  client.stop();
+}
 
 unsigned long onTime_old = 0;
 unsigned long offTime_old = 0;
@@ -78,6 +132,20 @@ void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval,
 
   unsigned long now = millis(); // update time stampel
 
+  Serial.println("\nTurn off pin ");
+  for (int i = 0; i < maxOut; i++) {
+    Serial.print("############### ");
+    Serial.println(i + 1);
+    switchControl(i+1, 0);
+    delay(500);
+  }
+  for (int i = 0; i < maxOut; i++) {
+    Serial.print("******* ");
+    Serial.println(i + 1);
+    switchControl(i+1, 1);
+    delay(500);
+  }
+/*
 
   if (status == true) {
     if (now - onTime_old > tm) { // time to reverse the switcher status.
@@ -85,18 +153,9 @@ void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval,
       for (int i = 0; i < maxOut; i++) {
         Serial.print("############### ");
         Serial.println(i + 1);
-        client.print("GET /SWOV.CGI?s");
-        client.print(i + 1);
-        client.println("=0");
-        client.flush();
-        //        client.stop();
-        delay(100);
-        while (client.available() /*&& goon == false*/) {
-          char c = client.read(); // can not comment out, if so, buffer overflow.
-        }
-
+        switchControl(i+1, 0);
+        // delay(1000);
       }
-      delay(1000);
     }
 
     onTime_old = now;
@@ -104,51 +163,39 @@ void work(int t, int r, int p) { //t-> ein Zeit Interval, r-> aus Zeit Interval,
     status = false;
     Serial.println(F("Turn all pins off"));
   }
-}
-
-
-else if (status == false) {
-  if (now - offTime_old > rm) { // time to reverse the switcher status.
-    status = true;
-    offTime_old = now;
-    onTime_old = now;
-    // Generate 'p' outputs as "On", '6-p' output as "Off"
-    int k = 1; // sum num. for selected number in IOs
-    int arr[p]; // array save selected IO pins.
-    arr[0] = random(maxOut);
-    while ( k < p) {
-      int m = random(maxOut);
-      boolean thrown = false;
-      for (int i = 0; i < k; i++) {
-        if (m == arr[i]) {
-          thrown = true;
+  else if (status == false) {
+    if (now - offTime_old > rm) { // time to reverse the switcher status.
+      status = true;
+      offTime_old = now;
+      onTime_old = now;
+      // Generate 'p' outputs as "On", '6-p' output as "Off"
+      int k = 1; // sum num. for selected number in IOs
+      int arr[p]; // array save selected IO pins.
+      arr[0] = random(maxOut);
+      while ( k < p) {
+        int m = random(maxOut);
+        boolean thrown = false;
+        for (int i = 0; i < k; i++) {
+          if (m == arr[i]) {
+            thrown = true;
+          }
+        }
+        if (thrown == false) {
+          arr[k] = m; // push in the result.
+          k++;
         }
       }
-      if (thrown == false) {
-        arr[k] = m; // push in the result.
-        k++;
+      Serial.println(F("\nGenerated random switch IO now:"));
+      for (int i = 0; i < p; i++) {
+        Serial.print("************* ");
+        Serial.println(arr[i] + 1);        
+        switchControl(arr[i]+1, 1);
+        // delay(1000);
       }
-    }
-    Serial.println(F("\nGenerated random switch IO now:"));
-    for (int i = 0; i < p; i++) {
-      Serial.print("************* ");
-      Serial.println(arr[i] + 1);
-      // Make a HTTP request:
-      client.print("GET /SWOV.CGI?s");
-      client.print(arr[i] + 1);
-      client.println("=1");
-      client.flush();
-      delay(100);
-      while (client.available()) {
-        char c = client.read(); // can not comment out, if so, buffer overflow.
-        //          Serial.print(c);
-      }
-      delay(1000);
     }
   }
-}
 
-
+*/
 
 }
 
@@ -312,22 +359,22 @@ void setup() {
   webServer.begin();
 
   // give the Ethernet shield a second to initialize:
-  delay(100);
-  Serial.println(F("connecting..."));
-  // if you get a connection, report back via serial:
-  if (client.connect(server, 80)) {
-    Serial.println(F("connected"));
-  } else {
-    // if you didn't get a connection to the server:
-    Serial.println(F("connection failed"));
-    Serial.println(F("Retry connect to Web Server of Power Distributor"));
-    delay(500);
-    while (!client.connect(server, 80)) {
-      Serial.println(F("Retry connect to Web Server of Power Distributor"));
-      delay(250);
-    }
-    Serial.println(F("Retry Successed, connected!"));
-  }
+  // delay(100);
+  // Serial.println(F("connecting..."));
+  // // if you get a connection, report back via serial:
+  // if (client.connect(server, 80)) {
+  //   Serial.println(F("connected"));
+  // } else {
+  //   // if you didn't get a connection to the server:
+  //   Serial.println(F("connection failed"));
+  //   Serial.println(F("Retry connect to Web Server of Power Distributor"));
+  //   delay(500);
+  //   while (!client.connect(server, 80)) {
+  //     Serial.println(F("Retry connect to Web Server of Power Distributor"));
+  //     delay(250);
+  //   }
+  //   Serial.println(F("Retry Successed, connected!"));
+  // }
 }
 
 
@@ -356,5 +403,6 @@ void loop() {
 
   listenForEthernetClients(); // listen for incoming Ethernet connections:
 
-  work(10, 10, 5);
+  work(8, 8, 5); // OnInterval, OffInterval, RandomOnLightNumber
+  //  Serial.println(F("main loop."));
 }
